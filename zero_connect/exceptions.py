@@ -60,4 +60,3 @@ class ServiceNotFound(BaseError):
     """Raised when the service is not found."""
     def __init__(self, name: str) -> None:
         super().__init__(f"Service {name} is not found")
-

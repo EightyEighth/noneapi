@@ -1,5 +1,5 @@
 import os
-import pdoc
+from pdoc import web, pdoc
 from pathlib import Path
 from .rpc import _REGISTERED_METHODS
 from .events import _REGISTERED_EVENT_HANDLERS
@@ -51,7 +51,7 @@ def generate_docs_for_service(
     if isinstance(output_dir, str):
         output_dir = Path(output_dir)
 
-    pdoc.pdoc(*list_paths, output_directory=output_dir)
+    pdoc(*list_paths, output_directory=output_dir)
 
 
 def start_docs_server(
@@ -65,7 +65,7 @@ def start_docs_server(
     :return: None
     """
 
-    httpd = pdoc.web.DocServer((host, port), modules)
+    httpd = web.DocServer((host, port), modules)
 
     with httpd:
         httpd.serve_forever()

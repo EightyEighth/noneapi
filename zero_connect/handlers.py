@@ -1,9 +1,9 @@
 from typing import Any, Protocol
-from .exceptions import RemoteError
+from .exceptions import RemoteError, RemoteErrorData
 
 
 class BaseRemoteErrorHandler(Protocol):
-    def handle_exception(self, error: Exception) -> dict:
+    def handle_exception(self, error: Exception) -> RemoteErrorData:
         ...
 
     def raise_remote_error(self, data: dict):
@@ -14,7 +14,7 @@ class BaseRemoteErrorHandler(Protocol):
 
 
 class RemoteErrorHandler(BaseRemoteErrorHandler):
-    def handle_exception(self, error: Exception) -> dict:
+    def handle_exception(self, error: Exception) -> RemoteErrorData:
         return RemoteError(
             original_exc=error,
             message=str(error)

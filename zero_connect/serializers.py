@@ -1,46 +1,37 @@
-import msgpack
-from typing import TypeVar, Protocol, runtime_checkable
+import json
+import orjson
+from abc import ABC, abstractmethod
 
 
-RPCRequest = TypeVar("RPCRequest", bound=dict)
-RPCResponse = TypeVar("RPCResponse", bound=dict)
-SerializeProtocol = TypeVar("SerializeProtocol")
-
-
-@runtime_checkable
-class BaseSerializer(Protocol[SerializeProtocol, RPCRequest, RPCResponse]):
-    """
-    Base class for all serializers. It just serializes and deserializes data.
-    """
-
-    def serialize(self, data: RPCRequest) -> bytes:
+class BaseSerializer(ABC):
+    def serialize(self, data: dict) -> bytes:
         return self._serialize(data)
 
-    def deserialize(self, data: bytes) -> RPCResponse:
+    def deserialize(self, data: bytes) -> dict:
         return self._deserialize(data)
 
-    def _serialize(self, data: RPCRequest) -> bytes:
-        """
-        This method should be implemented in subclasses.
-        Method convert data type that you choose to bytes before sending.
-        """
+    @abstractmethod
+    def _serialize(self, data: dict) -> bytes:
         ...
 
-    def _deserialize(self, data: bytes) -> RPCResponse:
-        """
-        This method should be implemented in subclasses.
-        Method convert bytes to data type that you choose after receiving.
-        """
+    @abstractmethod
+    def _deserialize(self, data: bytes) -> dict:
         ...
 
 
-class MSGPackSerializer(BaseSerializer[msgpack, RPCRequest, RPCResponse]):
+class JSONSerializer(BaseSerializer):
 
-    def __init__(self, serialize_protocol: msgpack = msgpack):
-        self._serializer = serialize_protocol
+    def _serialize(self, data: dict) -> bytes:
+        return json.dumps(data).encode()
 
-    def _serialize(self, data: RPCRequest) -> bytes:
-        return msgpack.packb(data)
+    def _deserialize(self, data: bytes) -> dict:
+        return json.loads(data.decode())
 
-    def _deserialize(self, data: bytes) -> RPCResponse:
-        return msgpack.unpackb(data)
+
+class ORJSONSerializer(BaseSerializer):
+
+    def _serialize(self, data: dict) -> bytes:
+        return orjson.dumps(data)
+
+    def _deserialize(self, data: bytes) -> dict:
+        return orjson.loads(data)

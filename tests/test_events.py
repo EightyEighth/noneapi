@@ -28,7 +28,7 @@ def test_event_dispatcher():
         name = "math_service"
         dispatch = events.EventDispatcher(host="127.0.0.1", port=6551)
 
-        @rpc.rpc
+        @rpc
         def sum(self, a, b):
             _result = a + b
             self.dispatch("sum", _result)

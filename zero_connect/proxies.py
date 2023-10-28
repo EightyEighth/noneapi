@@ -1,9 +1,8 @@
-import zmq
+import zmq.green as zmq
 
 from typing import Any, TypedDict
 from .protocols import RPCProtocol
-from .transports import ZeroMQTransport
-from .serializers import MSGPackSerializer
+from .serializers import ORJSONSerializer
 from .exceptions import ServiceNotFound
 from .handlers import RemoteErrorHandler
 
@@ -34,6 +33,7 @@ class RPCProxy:
         self._method_name = None
         self._active_async_calls: dict[str, zmq.Socket] = {}
         self._is_async_context = False
+        self._protocol = None
 
     def __getattr__(self, name: str) -> "Any":
         self._method_name = name
@@ -119,16 +119,17 @@ class RPCProxy:
 
         return response
 
-    @staticmethod
-    def _get_protocol() -> Any:
+    def _get_protocol(self) -> Any:
         """
         Get protocol from current service if it exists else return default.
         :return: RPCProtocol - protocol for communication between services.
         """
-        return RPCProtocol(
-            transport=ZeroMQTransport(),
-            serializer=MSGPackSerializer(),
-        )
+        if not self._protocol:
+            self._protocol: RPCProtocol[ORJSONSerializer] = RPCProtocol(
+                ORJSONSerializer()
+            )
+
+        return self._protocol
 
 
 class ServiceProxy:

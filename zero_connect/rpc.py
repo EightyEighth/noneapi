@@ -1,4 +1,6 @@
 from typing import Callable
+
+
 _REGISTERED_METHODS: dict[str, Callable] = {}
 
 

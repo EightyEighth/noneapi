@@ -1,12 +1,7 @@
 from typing import Protocol, runtime_checkable, TypeVar
 
-from .protocols import RPCProtocol
-from .transports import BaseTransport
 
-from .serializers import BaseSerializer
-
-
-_T = TypeVar("_T")
+_T = TypeVar("_T", covariant=True)
 
 
 @runtime_checkable

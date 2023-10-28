@@ -1,12 +1,12 @@
+import zmq.green as zmq
 from dataclasses import dataclass, asdict
 from typing import TypeVar, Generic, Any
-from zero_connect.transports import BaseTransport, PROTOCOLS, TCP
+from zero_connect.transports import ProtocolType, TCP, ZeroMQTransport
 from zero_connect.serializers import BaseSerializer
 
 
 T = TypeVar("T")
-_Transport = TypeVar("_Transport")
-_Serializer = TypeVar("_Serializer")
+_Serializer = TypeVar("_Serializer", bound=BaseSerializer)
 
 
 @dataclass(frozen=True)
@@ -47,29 +47,19 @@ class RPCResponse(_BaseConvertor):
     request: RPCRequest
 
 
-class RPCProtocol(Generic[_Transport, _Serializer]):
+class RPCProtocol(Generic[_Serializer]):
     """
     Base class for all RPC protocols. This class is responsible for
     convert data to RPC request and RPC response for communication between
     services.
     """
-    def __init__(self, transport: _Transport, serializer: _Serializer):
-
-        assert transport, "Transport is not defined"
-        assert serializer, "Serializer is not defined"
-
-        if not isinstance(transport, BaseTransport):
-            raise ValueError("Transport should be instance of BaseTransport")
-
-        if not isinstance(serializer, BaseSerializer):
-            raise ValueError("Serializer should be instance of BaseSerializer")
-
-        self._transport = transport
+    def __init__(self, serializer: _Serializer):
+        self._transport = ZeroMQTransport()
         self._serializer = serializer
 
     @staticmethod
     def _build_request(
-            method: str, args: Any, kwargs: Any, headers: dict = None
+            method: str, args: Any, kwargs: Any, headers: dict | None = None
     ) -> RPCRequest:
         return RPCRequest(
             method=method,
@@ -83,19 +73,25 @@ class RPCProtocol(Generic[_Transport, _Serializer]):
             method: str,
             args: list[Any] | tuple[Any],
             kwargs: dict[Any, Any],
-            host: str | None = None,
-            port: int | None = None,
-            headers: dict[Any, Any] = None,
-            protocol: PROTOCOLS = TCP
-    ) -> Any:
+            host: str,
+            port: int,
+            headers: dict[Any, Any] | None = None,
+            protocol: ProtocolType = TCP
+    ) -> dict | list:
         """
         Call remote method.
         """
-        request = self._build_request(method, args, kwargs, headers)
-        data = self._serializer.serialize(request.to_dict())
-        result = self._transport.request(host, port, data, protocol)
+        request: RPCRequest = self._build_request(
+            method, args, kwargs, headers
+        )
 
-        result = self._serializer.deserialize(result)
+        data: bytes = self._serializer.serialize(request.to_dict())
+        bytes_result: bytes = self._transport.request(
+            host, port, data, protocol
+        )
+
+        result: dict | list = self._serializer.deserialize(bytes_result)
+
         return result
 
     def send(
@@ -103,12 +99,12 @@ class RPCProtocol(Generic[_Transport, _Serializer]):
         method: str,
         args: list[Any] | tuple[Any],
         kwargs: dict[Any, Any],
-        host: str | None = None,
-        port: int | None = None,
+        host: str,
+        port: int,
         socket: Any = None,
-        headers: dict[Any, Any] = None,
-        protocol: PROTOCOLS = TCP
-    ) -> Any:
+        headers: dict[Any, Any] | None = None,
+        protocol: ProtocolType = TCP
+    ) -> zmq.Socket:
         """
         Send data to the remote endpoint. Low level method.
         Uses by server for sending responses.
@@ -121,49 +117,54 @@ class RPCProtocol(Generic[_Transport, _Serializer]):
         :arg args: args to send
         :arg kwargs: kwargs to send
         :arg socket: socket to use
-        :return: Any
+        :return: zmq.Socket
         """
-        request = self._build_request(method, args, kwargs, headers)
-        data = self._serializer.serialize(request.to_dict())
+        request: RPCRequest = self._build_request(
+            method, args, kwargs, headers
+        )
+        data: bytes = self._serializer.serialize(request.to_dict())
 
-        result = self._transport.send(
+        connection: zmq.Socket = self._transport.send(
             data, protocol, host=host, port=port, socket=socket
         )
 
-        return result
+        return connection
 
-    def receive(self, socket: Any) -> Any:
+    def receive(self, socket: zmq.Socket) -> dict | list:
         """
         Receive data from the remote endpoint. Low level method.
         Uses by server for receiving requests.
         """
 
-        bytes_result = self._transport.receive(socket)
-        result = self._serializer.deserialize(bytes_result)
+        bytes_result: bytes = self._transport.receive(socket)
+        result: dict | list = self._serializer.deserialize(bytes_result)
 
         return result
 
     def dispatch(
             self, host: str, port: int,  topic: str, payload: dict,
-            protocol: PROTOCOLS = TCP, through_broker: bool = False
+            protocol: ProtocolType = TCP, through_broker: bool = False
     ) -> None:
         """
         Publish event to subscribers.
         """
-        data = self._serializer.serialize(payload)
+        data: bytes = self._serializer.serialize(payload)
         self._transport.dispatch(
             host, port, topic, data, protocol, through_broker
         )
 
-    def parse_call(self, data: bytes) -> tuple[str, list[Any], dict[Any, Any]]:
+    def parse_call(
+            self, data: bytes
+    ) -> tuple[str, tuple[Any], dict[Any, Any]]:
         """
         Parse incoming data to method name, args and kwargs.
         :param data: bytes
         :return: tuple[str, list[Any], dict[Any, Any]]
         """
-        data = self._serializer.deserialize(data)
+        result: dict = self._serializer.deserialize(data)
+        request = RPCRequest.from_dict(result)
 
-        return data["method"], data["args"], data["kwargs"]
+        return request.method, request.args, request.kwargs
 
     def parse_event(self, data: bytes) -> dict:
         """

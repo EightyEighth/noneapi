@@ -1,6 +1,6 @@
 import zmq.green as zmq
 from typing import Callable
-from zero_connect.transports import TCP, PROTOCOLS
+from zero_connect.transports import TCP, ProtocolType
 from loguru import logger
 
 
@@ -25,7 +25,7 @@ class ZeroMQMultiThreadRPCServer:
     """
     def __init__(
         self, host: str, port: int, callback: Callable[[bytes], bytes],
-        protocol: PROTOCOLS = TCP, workers: int = 1,
+        protocol: ProtocolType = TCP, workers: int = 1,
         through_broker: bool = False,
     ) -> None:
         self._host = host
@@ -111,7 +111,7 @@ class ZeroMQSubscribeServer:
     """
     def __init__(
         self, host: str, port: int, callback: Callable[[bytes, bytes], bytes],
-        topics: list[str], protocol: PROTOCOLS = TCP, workers: int = 1,
+        topics: list[str], protocol: ProtocolType = TCP, workers: int = 1,
         is_debug: bool = False, through_broker: bool = False,
     ) -> None:
         self._host = host
@@ -135,15 +135,10 @@ class ZeroMQSubscribeServer:
         for topic in self._topics:
             socket.setsockopt(zmq.SUBSCRIBE, topic.encode())
 
-        logger.info(
-            f"Subscribing to topics: {self._topics} "
-        )
-
         socket.connect(f"{self._protocol}://{self._host}:{self._port}")
 
         while True:
-            topic, message = socket.recv_multipart()
-            logger.info(f"Received topic: {topic} and message: {message}")
-            result: bytes | None = self._callback(topic, message)
+            _topic, message = socket.recv_multipart()
+            result: bytes | None = self._callback(_topic, message)
             if result:
                 socket.send(result)

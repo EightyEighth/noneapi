@@ -2,14 +2,14 @@ import gevent
 import weakref
 from loguru import logger
 from pathlib import Path
-from typing import Type, Generic, TypeVar, Any, List
+from typing import Type, Generic, TypeVar, Any, List, Union
 from gevent import monkey
 from gevent.greenlet import Greenlet
 
 from .protocols import RPCProtocol
-from .transports import ZeroMQTransport, PROTOCOLS, TCP
+from .transports import ProtocolType, TCP
 
-from .serializers import MSGPackSerializer
+from .serializers import ORJSONSerializer
 from .rpc import _REGISTERED_METHODS
 from .events import _REGISTERED_EVENT_HANDLERS
 from .servers import ZeroMQMultiThreadRPCServer, ZeroMQSubscribeServer
@@ -25,6 +25,8 @@ monkey.patch_all()
 
 _SI = TypeVar("_SI", bound=ServiceInterface)
 _BR = TypeVar("_BR", bound=RemoteErrorHandler)
+
+Address = Union[str, Path]
 
 
 class Container(Generic[_SI, _BR]):
@@ -52,8 +54,8 @@ class Container(Generic[_SI, _BR]):
         event_host: str | None = None,
         event_port: int | None = None,
         workers: int = 1,
-        protocol: PROTOCOLS = TCP,
-        events_protocol: PROTOCOLS = TCP,
+        protocol: ProtocolType = TCP,
+        events_protocol: ProtocolType = TCP,
         is_debug: bool = False,
         through_broker: bool = False,
     ) -> None:
@@ -87,7 +89,7 @@ class Container(Generic[_SI, _BR]):
 
         server.run()
 
-    def init(self, is_debug: bool = False) -> ServiceInterface:
+    def init(self) -> ServiceInterface:
         """
         Initialize the protocol.
 
@@ -98,9 +100,8 @@ class Container(Generic[_SI, _BR]):
         protocol = getattr(service, "protocol", None)
 
         if not protocol:
-            protocol = RPCProtocol(
-                transport=ZeroMQTransport(is_debug=is_debug),
-                serializer=MSGPackSerializer(),
+            protocol: RPCProtocol[ORJSONSerializer] = RPCProtocol(
+                ORJSONSerializer()
             )
             service.protocol = protocol
 
@@ -122,7 +123,7 @@ class Container(Generic[_SI, _BR]):
             self._event_server().stop()
 
     def subscribe(
-            self, host: str, port: int, protocol: PROTOCOLS = TCP,
+            self, host: str, port: int, protocol: ProtocolType = TCP,
             workers: int = 1, is_debug: bool = False,
             through_broker: bool = False
     ) -> None:
@@ -181,17 +182,9 @@ class Container(Generic[_SI, _BR]):
         :return: Response data.
         """
         method, args, kwargs, = self._service.protocol.parse_call(data)
-        logger.info(self._service)
         full_method_name = f"{self._service.__class__.__name__}.{method}"
 
-        logger.info(f"REGISTERED_METHODS: {_REGISTERED_METHODS}")
-        logger.info(f"full_method_name: {full_method_name}")
-
         if full_method_name not in _REGISTERED_METHODS:
-            logger.info(
-                f"Method {full_method_name} is not registered in"
-                f" {_REGISTERED_METHODS}"
-            )
             return None
 
         _method = getattr(self._service, method)

@@ -1,28 +1,10 @@
-import pytest
 from zero_connect.protocols import RPCProtocol
-from zero_connect.transports import ZeroMQTransport
-from zero_connect.serializers import MSGPackSerializer
-
-
-def test_create_without_transport():
-    with pytest.raises(AssertionError):
-        RPCProtocol(transport=None, serializer=None)
-
-
-def test_create_without_serializer():
-    with pytest.raises(AssertionError):
-        RPCProtocol(transport=1, serializer=None)
-
-
-def test_create_with_transport_and_serializer():
-    with pytest.raises(ValueError):
-        RPCProtocol(transport=1, serializer=1)
+from zero_connect.serializers import JSONSerializer
 
 
 def test_create_correct_protocol(echo_server):
     protocol = RPCProtocol(
-        transport=ZeroMQTransport(),
-        serializer=MSGPackSerializer()
+        serializer=JSONSerializer()
     )
 
     result = protocol.call(
