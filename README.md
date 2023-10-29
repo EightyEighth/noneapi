@@ -146,7 +146,7 @@ Here's how to get started with MyLibrary:
 
 1. **Install**: 
     ```bash
-    pip install zero-connect
+    pip install noneapi
     ```
 
 2. **RPC**: 
@@ -163,7 +163,7 @@ Here's how to get started with MyLibrary:
             return order
 
    ```
-    In this scenario, any service using `zero-connect` can communicate directly with this service by invoking the `add_order` method.
+    In this scenario, any service using `noneapi` can communicate directly with this service by invoking the `add_order` method.
 
     - **`name`**: Identifier for the service. This is used for service discovery and is mandatory for each service.
 
