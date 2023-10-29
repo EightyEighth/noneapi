@@ -4,6 +4,7 @@ from .exceptions import RemoteError
 from .handlers import BaseRemoteErrorHandler
 from .proxies import ClusterProxy, ServiceProxy
 from .rpc import rpc
+from .serializers import ORJSONSerializer, JSONSerializer, BaseSerializer
 
 __all__ = (
     "rpc",
@@ -15,4 +16,7 @@ __all__ = (
     "EventDispatcher",
     "event_handler",
     "BaseRemoteErrorHandler",
+    "ORJSONSerializer",
+    "JSONSerializer",
+    "BaseSerializer",
 )

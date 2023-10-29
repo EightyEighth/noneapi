@@ -6,7 +6,7 @@ This mini-framework (RPC like) allows you to easily build microservices that can
 
 > Just call your microservices like you would any other function.
 
-The goal of this framework is to simplify microservice interactions—no middleware necessary.
+The goal of this framework is to simplify microservice interactions, eliminating the need for middleware. To send parameters like 'user' or anything else, include them in the method arguments. This ensures clarity in the data sent to and received from the service. 
 
 
 Performance:
@@ -335,12 +335,43 @@ Here's how to get started with MyLibrary:
     In this case, we create a container with one service and run it with documentation server.
     It will be always available on `http://localhost:8081/`
 
+
+9.  **Custom serialization**
+    ```python
+    from noneapi import BaseSerializer
+    from noneapi import Protocol
+    from msgpack import packb, unpackb
+    
+    class MsgPackSerializer(BaseSerializer):
+        def _serialize(self, data: dict) -> bytes:
+            return packb(data)
+    
+        def _deserialize(self, data: bytes) -> dict:
+            return unpackb(data)
+
+    class OrderService:
+        name = 'order_service'
+        protocol: Protocol[MsgPackSerializer] = Protocol(MsgPackSerializer())
+    
+        @rpc
+        def add_order(self, order: dict):
+            # some code
+            return order
+    ```
+    In this case, we're creating a custom serializer for the service, applicable to all its methods. By default, NoneAPI employs a clean JSON serializer, powered by the ultra-fast orjson library. Feel free to use any serializer—just inherit from BaseSerializer and pass it to the Protocol class.
+    
+    _IMPORTANT_: If you change the serializer, you must change it on all services that will communicate with each other. Otherwise, you will get an error.
 ---
 
 ## Changelog
 
 ### Version 0.1.3 (2023-10-29)(alpha)
 - Initial release
+
+### Version 0.1.4 (2023-10-29)(alpha)
+- Add custom serializer 
+- Add custom serializer documentation
+
 
 ---
 
