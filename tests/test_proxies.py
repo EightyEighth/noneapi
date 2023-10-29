@@ -1,7 +1,7 @@
 import pytest
 
-from zero_connect.proxies import ServiceProxy, ClusterProxy
-from zero_connect.exceptions import ServiceNotFound
+from noneapi.proxies import ServiceProxy, ClusterProxy
+from noneapi.exceptions import ServiceNotFound, AsyncCallError
 
 
 def test_remote_service_call(echo_server):
@@ -64,7 +64,7 @@ def test_remote_service_try_call_without_async_context(echo_server):
         name = "test_service"
         service_a = ServiceProxy(host="127.0.0.1", port=5555)
 
-    with pytest.raises(AssertionError):
+    with pytest.raises(AsyncCallError):
         service = Service()
         service.service_a.test.async_call(1, 2, 3, test=1, test2=2)
 

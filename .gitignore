@@ -1,4 +1,5 @@
 venv/
+docs/
 .docs/
 .pytest_cache/
 # Byte-compiled / optimized / DLL files
@@ -13,6 +14,7 @@ __pycache__/
 .Python
 build/
 .idea/
+.coverage
 .vscode/
 develop-eggs/
 dist/

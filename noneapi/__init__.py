@@ -1,19 +1,18 @@
-from .rpc import rpc
 from .containers import Container, ContainerRunner
-from .proxies import ServiceProxy
+from .events import EventDispatcher, event_handler
 from .exceptions import RemoteError
-from .events import EventDispatcher
 from .handlers import BaseRemoteErrorHandler
-
+from .proxies import ClusterProxy, ServiceProxy
+from .rpc import rpc
 
 __all__ = (
     "rpc",
     "Container",
     "ContainerRunner",
     "ServiceProxy",
+    "ClusterProxy",
     "RemoteError",
     "EventDispatcher",
-    "BaseRemoteErrorHandler"
+    "event_handler",
+    "BaseRemoteErrorHandler",
 )
-
-__version__ = (0, 0, 1)

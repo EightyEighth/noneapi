@@ -1,6 +1,6 @@
-import zmq.green as zmq
-from typing import Protocol, runtime_checkable, Any, Literal, cast
+from typing import Any, Literal, Protocol, cast, runtime_checkable
 
+import zmq.green as zmq
 
 TCP = cast(Literal["tcp"], "tcp")
 INPROC = cast(Literal["inproc"], "inproc")
@@ -10,10 +10,8 @@ ProtocolType = Literal["tcp", "inproc"]
 
 @runtime_checkable
 class BaseTransport(Protocol):
-
     def request(
-            self, host: str, port: int,  data: bytes,
-            protocol: ProtocolType = TCP
+        self, host: str, port: int, data: bytes, protocol: ProtocolType = TCP
     ) -> bytes:
         """
         Send request to the remote endpoint. Low level method.
@@ -27,8 +25,13 @@ class BaseTransport(Protocol):
         ...
 
     def dispatch(
-        self, host: str, port: int, topic: str, data: bytes,
-        protocol: ProtocolType = TCP, through_broker: bool = False
+        self,
+        host: str,
+        port: int,
+        topic: str,
+        data: bytes,
+        protocol: ProtocolType = TCP,
+        through_broker: bool = False,
     ) -> None:
         """
         Dispatch event to the remote endpoint. Low level method.
@@ -45,8 +48,11 @@ class BaseTransport(Protocol):
 
     @staticmethod
     def send(
-        data: bytes, protocol: ProtocolType = TCP, host: str | None = None,
-        port: int | None = None, socket: Any = None
+        data: bytes,
+        protocol: ProtocolType = TCP,
+        host: str | None = None,
+        port: int | None = None,
+        socket: Any = None,
     ) -> Any:
         """
         Send data to the remote endpoint. Low level method.
@@ -77,6 +83,7 @@ class ZeroMQTransport(BaseTransport):
     """
     Base class for all transports. It just sent and receive data.
     """
+
     def __init__(self, is_debug: bool = False) -> None:
         self._context = zmq.Context()
         self._pub_event_socket: zmq.Socket | None = None
@@ -84,8 +91,7 @@ class ZeroMQTransport(BaseTransport):
         self._is_debug = is_debug
 
     def request(
-            self, host: str, port: int,  data: bytes,
-            protocol: ProtocolType = TCP
+        self, host: str, port: int, data: bytes, protocol: ProtocolType = TCP
     ) -> bytes:
         """
         Send request to the remote endpoint. Low level method.
@@ -106,8 +112,13 @@ class ZeroMQTransport(BaseTransport):
         return message
 
     def dispatch(
-            self, host: str, port: int, topic: str, data: bytes,
-            protocol: ProtocolType = TCP, through_broker: bool = False
+        self,
+        host: str,
+        port: int,
+        topic: str,
+        data: bytes,
+        protocol: ProtocolType = TCP,
+        through_broker: bool = False,
     ) -> None:
         if not self._pub_event_socket:
             self._pub_event_socket = self._context.socket(zmq.PUB)
@@ -121,11 +132,12 @@ class ZeroMQTransport(BaseTransport):
 
     @staticmethod
     def send(
-        data: bytes, protocol: ProtocolType = TCP,
-        host: str | None = None, port: int | None = None,
-        socket: zmq.Socket | None = None
+        data: bytes,
+        protocol: ProtocolType = TCP,
+        host: str | None = None,
+        port: int | None = None,
+        socket: zmq.Socket | None = None,
     ) -> zmq.Socket:
-
         assert (host and port) or socket, "Host or socket should be defined"
 
         if not socket:

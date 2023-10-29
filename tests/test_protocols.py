@@ -1,5 +1,5 @@
-from zero_connect.protocols import RPCProtocol
-from zero_connect.serializers import JSONSerializer
+from noneapi.protocols import RPCProtocol
+from noneapi.serializers import JSONSerializer
 
 
 def test_create_correct_protocol(echo_server):

@@ -1,17 +1,16 @@
 import os
-from pdoc import web, pdoc
 from pathlib import Path
-from .rpc import _REGISTERED_METHODS
+
+from gevent import monkey  # type: ignore
+from pdoc import pdoc, web
+
 from .events import _REGISTERED_EVENT_HANDLERS
-from gevent import monkey
+from .rpc import _REGISTERED_METHODS
 
 monkey.patch_all()
 
 
-__all__ = (
-    "generate_docs_for_service",
-    "start_docs_server"
-)
+__all__ = ("generate_docs_for_service", "start_docs_server")
 
 
 def get_paths(service_name: str) -> list[Path]:
@@ -24,8 +23,8 @@ def get_paths(service_name: str) -> list[Path]:
 
     event_paths = set()
 
-    for key, handler in _REGISTERED_EVENT_HANDLERS.items():
-        if service_name not in key:
+    for k, handler in _REGISTERED_EVENT_HANDLERS.items():
+        if service_name not in k:
             continue
 
         event_paths.add(Path(handler.__code__.co_filename))  # type: ignore
@@ -37,7 +36,7 @@ def get_paths(service_name: str) -> list[Path]:
 
 
 def generate_docs_for_service(
-        list_paths: list[Path],  output_dir: Path | str | None = None
+    list_paths: list[Path], output_dir: Path | str | None = None
 ) -> None:
     """
     Generate documentation for the service.
@@ -54,9 +53,7 @@ def generate_docs_for_service(
     pdoc(*list_paths, output_directory=output_dir)
 
 
-def start_docs_server(
-        modules: list[Path | str], host: str, port: int
-) -> None:
+def start_docs_server(modules: list[str], host: str, port: int) -> None:
     """
     Start the documentation server.
     :param modules: List of modules to generate documentation for.

@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+
+[project]
+name = "noneapi"
+version = "0.1.1"
+description = "Small RPC framework based on ZeroMQ"
+readme = "README.md"
+authors = [{ name = "Denys Rozlomii", email = "eighty.eighth.inc@gmail.com" }]
+license = { text = "MIT" }
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11"
+]
+dependencies = [
+    "pyzmq==25.1.1",
+    "loguru==0.7.2",
+    "gevent==23.9.1",
+    "pdoc==14.1.0",
+    "pydantic==2.4.2",
+    "orjson==3.9.10"
+]
+optional-dependencies = { dev = ["pytest", "flake8", "black", "mypy", "isort", "pytest-cov", "requests"] }
+
+[project.urls]
+repository = "https://github.com/EightyEighth/noneapi"

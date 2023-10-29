@@ -1,55 +1,56 @@
-import gevent
 import weakref
-from loguru import logger
 from pathlib import Path
-from typing import Type, Generic, TypeVar, Any, List, Union
-from gevent import monkey
-from gevent.greenlet import Greenlet
+from typing import Any, Generic, List, Type, TypeVar, Union
 
-from .protocols import RPCProtocol
-from .transports import ProtocolType, TCP
+import gevent  # type: ignore
+from gevent import monkey  # type: ignore
+from gevent.greenlet import Greenlet  # type: ignore
+from loguru import logger
 
-from .serializers import ORJSONSerializer
-from .rpc import _REGISTERED_METHODS
+from .docs import generate_docs_for_service, get_paths, start_docs_server
 from .events import _REGISTERED_EVENT_HANDLERS
-from .servers import ZeroMQMultiThreadRPCServer, ZeroMQSubscribeServer
-from .proxies import ServiceProxy
-from .handlers import RemoteErrorHandler
-from .validations import validate_or_ignore
 from .exceptions import ContainerStopped
+from .handlers import BaseRemoteErrorHandler, RemoteErrorHandler
+from .protocols import RPCProtocol
+from .proxies import ServiceProxy
+from .rpc import _REGISTERED_METHODS
+from .serializers import ORJSONSerializer
+from .servers import ZeroMQRPCServer, ZeroMQSubscribeServer
 from .services import ServiceInterface
-from .docs import generate_docs_for_service, start_docs_server, get_paths
+from .transports import TCP, ProtocolType
+from .validations import validate_or_ignore
 
 monkey.patch_all()
 
-
+T = TypeVar("T")
 _SI = TypeVar("_SI", bound=ServiceInterface)
-_BR = TypeVar("_BR", bound=RemoteErrorHandler)
 
 Address = Union[str, Path]
 
 
-class Container(Generic[_SI, _BR]):
+class Container(Generic[_SI]):
     """
-     Service container responsible for managing the lifecycle of services.
+    Service container responsible for managing the lifecycle of services.
 
-     :param service_class: Service class implementing the ServiceInterface.
-     :type service_class: Type[ServiceInterface]
+    :param service_class: Service class implementing the ServiceInterface.
+    :type service_class: Type[ServiceInterface]
     """
+
     def __init__(
-            self,
-            service_class: Type[_SI],
-            error_callback: Type[_BR] = RemoteErrorHandler,
+        self,
+        service_class: Type[_SI],
+        error_callback: Type[BaseRemoteErrorHandler] = RemoteErrorHandler,
     ):
         self._service_class = service_class
-        self._service = None
+        self._service: _SI | None = None
         self._error_callback = error_callback
-        self._rpc_server: weakref.ref[ZeroMQMultiThreadRPCServer] | None = None
-        self._event_server: weakref.ref[ZeroMQSubscribeServer] | None = None
+        self._rpc_server: weakref.ref[ZeroMQRPCServer] | None = None
+        self._event_servers: list[weakref.ref[ZeroMQSubscribeServer]] = []
         self.modules: list[str | Path] = []
 
     def run(
-        self, host: str,
+        self,
+        host: str,
         port: int,
         event_host: str | None = None,
         event_port: int | None = None,
@@ -76,13 +77,20 @@ class Container(Generic[_SI, _BR]):
 
         if event_host and event_port:
             self.subscribe(
-                event_host, event_port, events_protocol, is_debug=is_debug,
-                through_broker=through_broker
+                event_host,
+                event_port,
+                events_protocol,
+                is_debug=is_debug,
+                through_broker=through_broker,
             )
 
-        server = ZeroMQMultiThreadRPCServer(
-            host=host, port=port, workers=workers, protocol=protocol,
-            callback=self._callback, through_broker=through_broker
+        server = ZeroMQRPCServer(
+            host=host,
+            port=port,
+            workers=workers,
+            protocol=protocol,
+            callback=self._callback,
+            through_broker=through_broker,
         )
 
         self._rpc_server = weakref.ref(server)
@@ -97,13 +105,13 @@ class Container(Generic[_SI, _BR]):
         """
 
         service = self._service_class()
-        protocol = getattr(service, "protocol", None)
+        protocol: RPCProtocol[ORJSONSerializer] | None = getattr(
+            service, "protocol", None
+        )
 
         if not protocol:
-            protocol: RPCProtocol[ORJSONSerializer] = RPCProtocol(
-                ORJSONSerializer()
-            )
-            service.protocol = protocol
+            protocol = RPCProtocol(ORJSONSerializer())
+            setattr(service, "protocol", protocol)
 
         self._service = service
 
@@ -116,16 +124,26 @@ class Container(Generic[_SI, _BR]):
         if not self._service or not self._rpc_server:
             raise ContainerStopped("Container is not running")
 
-        if self._rpc_server and self._rpc_server():
-            self._rpc_server().stop()
+        if self._rpc_server:
+            server = self._rpc_server()
 
-        if self._event_server and self._event_server():
-            self._event_server().stop()
+            if server:
+                server.stop()
+
+        for server_ref in self._event_servers:
+            event_server = server_ref()
+
+            if event_server:
+                event_server.stop()
 
     def subscribe(
-            self, host: str, port: int, protocol: ProtocolType = TCP,
-            workers: int = 1, is_debug: bool = False,
-            through_broker: bool = False
+        self,
+        host: str,
+        port: int,
+        protocol: ProtocolType = TCP,
+        workers: int = 1,
+        is_debug: bool = False,
+        through_broker: bool = False,
     ) -> None:
         """
         Subscribe the service to events.
@@ -140,19 +158,21 @@ class Container(Generic[_SI, _BR]):
         assert self._service, "Service is not initialized"
 
         services = [
-            service for service in self._service.__class__.__dict__.values()
+            service
+            for service in self._service.__class__.__dict__.values()
             if isinstance(service, ServiceProxy)
         ]
 
         service_publishers = {
-            service._name: (service._event_host, service._event_port)   # type: ignore  # noqa
+            service._name: (service._event_host, service._event_port)  # type: ignore  # noqa
             for service in services
-            if service._event_host and service._event_port   # type: ignore  # noqa
+            if service._event_host and service._event_port  # type: ignore  # noqa
         }
 
         for publisher_name in service_publishers.keys():
             topics = [
-                ":".join(key) for key in _REGISTERED_EVENT_HANDLERS
+                ":".join(key)
+                for key in _REGISTERED_EVENT_HANDLERS
                 if key[0] == publisher_name
             ]
 
@@ -165,12 +185,12 @@ class Container(Generic[_SI, _BR]):
                 topics=topics,
                 workers=workers,
                 protocol=protocol,
-                callback=self._callback_event,    # type: ignore
+                callback=self._callback_event,  # type: ignore
                 is_debug=is_debug,
-                through_broker=through_broker
+                through_broker=through_broker,
             )
 
-            self._event_server = weakref.ref(server)
+            self._event_servers.append(weakref.ref(server))
 
             Greenlet(server.run).start()
 
@@ -181,7 +201,15 @@ class Container(Generic[_SI, _BR]):
         :param data: Incoming data.
         :return: Response data.
         """
-        method, args, kwargs, = self._service.protocol.parse_call(data)
+        if not self._service:
+            logger.warning("Service is not initialized")
+            return None
+
+        (
+            method,
+            args,
+            kwargs,
+        ) = self._service.protocol.parse_call(data)
         full_method_name = f"{self._service.__class__.__name__}.{method}"
 
         if full_method_name not in _REGISTERED_METHODS:
@@ -205,8 +233,13 @@ class Container(Generic[_SI, _BR]):
         :param topic: Event topic.
         :param payload: Event data.
         """
-        service_name, topic = topic.decode().split(":")
-        key = (service_name, topic)
+
+        if not self._service:
+            logger.warning("Service is not initialized")
+            return None
+
+        service_name, string_topic = topic.decode().split(":")
+        key = (service_name, string_topic)
 
         msg = self._service.protocol.parse_event(payload)
 
@@ -216,8 +249,8 @@ class Container(Generic[_SI, _BR]):
         _REGISTERED_EVENT_HANDLERS[key](self._service, msg)
 
 
-class SingletonMeta(type):
-    _instances = {}
+class SingletonMeta(type, Generic[T]):
+    _instances: dict[Type[T], T] = {}
 
     def __call__(cls, *args, **kwargs):
         if cls not in cls._instances:
@@ -230,12 +263,16 @@ class ContainerRunner(Greenlet, metaclass=SingletonMeta):
     """
     Container runner for running the containers
     """
+
     LOOP_WAIT_TIME = 1
     DELAY_BEFORE_START = 1
 
     def __init__(
-            self, is_document_server: bool = True, host: str = "127.0.0.1",
-            port: int = 8081, output_dir: str = ".docs"
+        self,
+        is_document_server: bool = True,
+        host: str = "127.0.0.1",
+        port: int = 8081,
+        output_dir: str = ".docs",
     ) -> None:
         Greenlet.__init__(self)
         self._is_document_server = is_document_server
@@ -246,8 +283,7 @@ class ContainerRunner(Greenlet, metaclass=SingletonMeta):
         self._workers: list[Greenlet] = []
 
     def register(
-            self, name: str, container: Container,
-            *args: List[Any], **kwargs: Any
+        self, name: str, container: Container, *args: List[Any], **kwargs: Any
     ) -> None:
         """
         Register container
@@ -255,7 +291,7 @@ class ContainerRunner(Greenlet, metaclass=SingletonMeta):
         self._containers[name] = {
             "container": container,
             "args": args,
-            "kwargs": kwargs
+            "kwargs": kwargs,
         }
 
     def _run(self) -> None:
@@ -268,7 +304,8 @@ class ContainerRunner(Greenlet, metaclass=SingletonMeta):
         for name, container in self._containers.items():
             worker = Greenlet(
                 run=container["container"].run,
-                *container["args"], **container["kwargs"]
+                *container["args"],
+                **container["kwargs"],
             )
             worker.start()
             self._workers.append(worker)
@@ -276,20 +313,20 @@ class ContainerRunner(Greenlet, metaclass=SingletonMeta):
             if self._is_document_server:
                 docs_paths.extend(
                     get_paths(
-                        container["container"]._service_class.__name__  # type: ignore  # noqa
+                        container["container"]._service_class.__name__
                     )
                 )
 
         if self._is_document_server:
             thread = Greenlet(
-                generate_docs_for_service,
-                docs_paths, output_dir=self._output_dir
+                generate_docs_for_service, docs_paths,
+                output_dir=self._output_dir
             )
             thread.start()
 
             doc_server = Greenlet(
                 run=start_docs_server,
-                **dict(modules=docs_paths, host=self._host, port=self._port)
+                **dict(modules=docs_paths, host=self._host, port=self._port),
             )
             logger.info(f"Starting docs server on {self._host}:{self._port}")
             doc_server.start()
@@ -322,10 +359,7 @@ class ContainerRunner(Greenlet, metaclass=SingletonMeta):
         """
         Restart the worker
         """
-        worker = Greenlet(
-            run=worker.run,
-            *worker.args, **worker.kwargs
-        )
+        worker = Greenlet(run=worker.run, *worker.args, **worker.kwargs)
         worker.start()
         self._workers.append(worker)
         logger.info(f"Worker {worker} is restarted")

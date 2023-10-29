@@ -1,5 +1,5 @@
-from zero_connect.exceptions import RemoteError
-from zero_connect.handlers import RemoteErrorHandler
+from noneapi.exceptions import RemoteError
+from noneapi.handlers import RemoteErrorHandler
 
 
 def test_remote_error_to_dict():

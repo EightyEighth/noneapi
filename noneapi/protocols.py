@@ -1,37 +1,30 @@
-import zmq.green as zmq
-from dataclasses import dataclass, asdict
-from typing import TypeVar, Generic, Any
-from zero_connect.transports import ProtocolType, TCP, ZeroMQTransport
-from zero_connect.serializers import BaseSerializer
+from dataclasses import asdict, dataclass
+from typing import Any, Generic, TypeVar
 
+import zmq.green as zmq
+
+from .serializers import BaseSerializer
+from .transports import TCP, ProtocolType, ZeroMQTransport
 
 T = TypeVar("T")
 _Serializer = TypeVar("_Serializer", bound=BaseSerializer)
 
 
 @dataclass(frozen=True)
-class _BaseConvertor:
-    def to_dict(self) -> dict:
-        return asdict(self)
-
-    @classmethod
-    def from_dict(cls, data: dict) -> "_BaseConvertor":
-        return cls(**data)
-
-
-@dataclass(frozen=True)
-class Meta(_BaseConvertor):
+class Meta:
     """
     Meta information about RPC request.
     """
+
     headers: dict
 
 
 @dataclass(frozen=True)
-class RPCRequest(_BaseConvertor):
+class RPCRequest:
     """
     RPC request body.
     """
+
     method: str
     args: tuple
     kwargs: dict
@@ -39,10 +32,11 @@ class RPCRequest(_BaseConvertor):
 
 
 @dataclass(frozen=True)
-class RPCResponse(_BaseConvertor):
+class RPCResponse:
     """
     RPC response body.
     """
+
     result: dict
     request: RPCRequest
 
@@ -53,13 +47,14 @@ class RPCProtocol(Generic[_Serializer]):
     convert data to RPC request and RPC response for communication between
     services.
     """
+
     def __init__(self, serializer: _Serializer):
         self._transport = ZeroMQTransport()
         self._serializer = serializer
 
     @staticmethod
     def _build_request(
-            method: str, args: Any, kwargs: Any, headers: dict | None = None
+        method: str, args: Any, kwargs: Any, headers: dict | None = None
     ) -> RPCRequest:
         return RPCRequest(
             method=method,
@@ -69,14 +64,14 @@ class RPCProtocol(Generic[_Serializer]):
         )
 
     def call(
-            self,
-            method: str,
-            args: list[Any] | tuple[Any],
-            kwargs: dict[Any, Any],
-            host: str,
-            port: int,
-            headers: dict[Any, Any] | None = None,
-            protocol: ProtocolType = TCP
+        self,
+        method: str,
+        args: list[Any] | tuple[Any],
+        kwargs: dict[Any, Any],
+        host: str,
+        port: int,
+        headers: dict[Any, Any] | None = None,
+        protocol: ProtocolType = TCP,
     ) -> dict | list:
         """
         Call remote method.
@@ -85,7 +80,7 @@ class RPCProtocol(Generic[_Serializer]):
             method, args, kwargs, headers
         )
 
-        data: bytes = self._serializer.serialize(request.to_dict())
+        data: bytes = self._serializer.serialize(asdict(request))
         bytes_result: bytes = self._transport.request(
             host, port, data, protocol
         )
@@ -103,7 +98,7 @@ class RPCProtocol(Generic[_Serializer]):
         port: int,
         socket: Any = None,
         headers: dict[Any, Any] | None = None,
-        protocol: ProtocolType = TCP
+        protocol: ProtocolType = TCP,
     ) -> zmq.Socket:
         """
         Send data to the remote endpoint. Low level method.
@@ -122,7 +117,7 @@ class RPCProtocol(Generic[_Serializer]):
         request: RPCRequest = self._build_request(
             method, args, kwargs, headers
         )
-        data: bytes = self._serializer.serialize(request.to_dict())
+        data: bytes = self._serializer.serialize(asdict(request))
 
         connection: zmq.Socket = self._transport.send(
             data, protocol, host=host, port=port, socket=socket
@@ -142,8 +137,13 @@ class RPCProtocol(Generic[_Serializer]):
         return result
 
     def dispatch(
-            self, host: str, port: int,  topic: str, payload: dict,
-            protocol: ProtocolType = TCP, through_broker: bool = False
+        self,
+        host: str,
+        port: int,
+        topic: str,
+        payload: dict,
+        protocol: ProtocolType = TCP,
+        through_broker: bool = False,
     ) -> None:
         """
         Publish event to subscribers.
@@ -155,14 +155,14 @@ class RPCProtocol(Generic[_Serializer]):
 
     def parse_call(
             self, data: bytes
-    ) -> tuple[str, tuple[Any], dict[Any, Any]]:
+    ) -> tuple[str, tuple[Any, ...], dict[Any, Any]]:
         """
         Parse incoming data to method name, args and kwargs.
         :param data: bytes
         :return: tuple[str, list[Any], dict[Any, Any]]
         """
         result: dict = self._serializer.deserialize(data)
-        request = RPCRequest.from_dict(result)
+        request = RPCRequest(**result)
 
         return request.method, request.args, request.kwargs
 
@@ -172,9 +172,7 @@ class RPCProtocol(Generic[_Serializer]):
         :param data: bytes
         :return: dict
         """
-        data = self._serializer.deserialize(data)
-
-        return data
+        return self._serializer.deserialize(data)
 
     def build_response(self, result: dict) -> bytes:
         """

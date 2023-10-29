@@ -3,10 +3,10 @@ import requests
 from gevent import Greenlet
 from threading import Thread
 
-from zero_connect.rpc import rpc
-from zero_connect.containers import Container, ContainerRunner
-from zero_connect.proxies import ServiceProxy
-from zero_connect.exceptions import RemoteError
+from noneapi.rpc import rpc
+from noneapi.containers import Container, ContainerRunner
+from noneapi.proxies import ServiceProxy
+from noneapi.exceptions import RemoteError
 
 
 def test_container_call_methods():

@@ -1,6 +1,6 @@
-from zero_connect.containers import Container, ContainerRunner
-from zero_connect.events import EventDispatcher
-from zero_connect.rpc import rpc
+from noneapi.containers import Container, ContainerRunner
+from noneapi.events import EventDispatcher
+from noneapi.rpc import rpc
 from gevent.threading import Thread
 from unittest import mock
 

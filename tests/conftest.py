@@ -1,12 +1,12 @@
 import pytest
 from pydantic import BaseModel
 from gevent.greenlet import Greenlet
-from zero_connect.servers import ZeroMQMultiThreadRPCServer
-from zero_connect.containers import Container, ServiceInterface
+from noneapi.servers import ZeroMQRPCServer
+from noneapi.containers import Container, ServiceInterface
 
 
 def start_server(host, port, callback):
-    server = ZeroMQMultiThreadRPCServer(
+    server = ZeroMQRPCServer(
         host=host, port=port, callback=callback
     )
 

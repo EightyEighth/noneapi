@@ -1,7 +1,7 @@
 import inspect
+from typing import Any, Callable
 
 from pydantic import BaseModel
-from typing import Any, Callable
 
 
 def validate_or_ignore(func: Callable, *args: list[Any], **kwargs: Any):

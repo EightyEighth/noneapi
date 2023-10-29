@@ -1,31 +1,38 @@
-import zmq.green as zmq
 from typing import Callable
-from zero_connect.transports import TCP, ProtocolType
+
+import zmq.green as zmq
 from loguru import logger
 
+from .transports import TCP, ProtocolType
 
-class ZeroMQMultiThreadRPCServer:
+
+class ZeroMQRPCServer:
     """
-        A ZeroMQ based RPC server with multithreading support.
+    A ZeroMQ based RPC server with multithreading support.
 
-        :param host: The host to bind the server.
-        :type host: str
+    :param host: The host to bind the server.
+    :type host: str
 
-        :param port: The port to bind the server.
-        :type port: int
+    :param port: The port to bind the server.
+    :type port: int
 
-        :param callback: The function to process the incoming messages.
-        :type callback: Callable[[bytes], bytes]
+    :param callback: The function to process the incoming messages.
+    :type callback: Callable[[bytes], bytes]
 
-        :param protocol: The communication protocol. Defaults to TCP.
-        :type protocol: PROTOCOLS, optional
+    :param protocol: The communication protocol. Defaults to TCP.
+    :type protocol: PROTOCOLS, optional
 
-        :param workers: The number of worker threads. Defaults to 1.
-        :type workers: int, optional
+    :param workers: The number of worker threads. Defaults to 1.
+    :type workers: int, optional
     """
+
     def __init__(
-        self, host: str, port: int, callback: Callable[[bytes], bytes],
-        protocol: ProtocolType = TCP, workers: int = 1,
+        self,
+        host: str,
+        port: int,
+        callback: Callable[[bytes], bytes | None],
+        protocol: ProtocolType = TCP,
+        workers: int = 1,
         through_broker: bool = False,
     ) -> None:
         self._host = host
@@ -109,10 +116,17 @@ class ZeroMQSubscribeServer:
     :param through_broker: Use broker or not.
     :type through_broker: bool, optional
     """
+
     def __init__(
-        self, host: str, port: int, callback: Callable[[bytes, bytes], bytes],
-        topics: list[str], protocol: ProtocolType = TCP, workers: int = 1,
-        is_debug: bool = False, through_broker: bool = False,
+        self,
+        host: str,
+        port: int,
+        callback: Callable[[bytes, bytes], bytes],
+        topics: list[str],
+        protocol: ProtocolType = TCP,
+        workers: int = 1,
+        is_debug: bool = False,
+        through_broker: bool = False,
     ) -> None:
         self._host = host
         self._port = port
@@ -120,8 +134,8 @@ class ZeroMQSubscribeServer:
         self._protocol = protocol
         self._workers = workers
         self._topics = topics
-        self._is_debug = is_debug
         self._through_broker = through_broker
+        self._is_active = False
 
     def run(self) -> None:
         """
@@ -137,8 +151,16 @@ class ZeroMQSubscribeServer:
 
         socket.connect(f"{self._protocol}://{self._host}:{self._port}")
 
-        while True:
+        self._is_active = True
+
+        while self._is_active:
             _topic, message = socket.recv_multipart()
             result: bytes | None = self._callback(_topic, message)
             if result:
                 socket.send(result)
+
+    def stop(self) -> None:
+        """
+        Stop the subscription server.
+        """
+        self._is_active = False

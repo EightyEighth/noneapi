@@ -1,10 +1,11 @@
+from typing import Any, TypedDict
+
 import zmq.green as zmq
 
-from typing import Any, TypedDict
+from .exceptions import AsyncCallError, ServiceNotFound
+from .handlers import RemoteErrorHandler
 from .protocols import RPCProtocol
 from .serializers import ORJSONSerializer
-from .exceptions import ServiceNotFound
-from .handlers import RemoteErrorHandler
 
 
 class ClusterServiceProxy(TypedDict):
@@ -15,25 +16,26 @@ class ClusterServiceProxy(TypedDict):
 
 class RPCProxy:
     """Base class for proxy classes."""
+
     async_methods = ["async_call", "result"]
 
     def __init__(
-            self,
-            current_service: Any,
-            host: str | None = None,
-            port: int | None = None,
-            event_host: str | None = None,
-            event_port: int | None = None
+        self,
+        current_service: Any,
+        host: str | None = None,
+        port: int | None = None,
+        event_host: str | None = None,
+        event_port: int | None = None,
     ) -> None:
         self._current_service = current_service
         self._host = host
         self._port = port
         self._event_host = event_host
         self._event_port = event_port
-        self._method_name = None
+        self._method_name: str = ""
         self._active_async_calls: dict[str, zmq.Socket] = {}
-        self._is_async_context = False
-        self._protocol = None
+        self._is_async_context: bool = False
+        self._protocol: RPCProtocol | None = None
 
     def __getattr__(self, name: str) -> "Any":
         self._method_name = name
@@ -46,9 +48,7 @@ class RPCProxy:
         self._is_async_context = True
         return self
 
-    def __exit__(
-            self, exc_type: Any, exc_val: Any, exc_tb: Any
-    ) -> None:
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         self._is_async_context = False
         for connection in self._active_async_calls.values():
             connection.close()
@@ -62,19 +62,25 @@ class RPCProxy:
         :param kwargs: kwargs for remote method.
         :return: None
         """
-        assert self._is_async_context, "Async call should be in async context"
+        if not self._is_async_context:
+            raise AsyncCallError("Async call should be in async context")
 
         protocol = self._get_protocol()
 
         connection = self._active_async_calls.get(self._method_name)
 
-        connection = protocol.send(
-            host=self._host, port=self._port, method=self._method_name,
-            args=args, kwargs=kwargs, headers={}, socket=connection
+        connection_new = protocol.send(
+            host=self._host,
+            port=self._port,
+            method=self._method_name,
+            args=args,
+            kwargs=kwargs,
+            headers={},
+            socket=connection,
         )
 
-        if self._method_name not in self._active_async_calls:
-            self._active_async_calls[self._method_name] = connection
+        if not connection:
+            self._active_async_calls[self._method_name] = connection_new
 
     def call_async(self, *args: Any, **kwargs: Any) -> None:
         self.async_call(*args, **kwargs)
@@ -84,12 +90,13 @@ class RPCProxy:
         Get result of async call.
         :return: Any
         """
-        assert self._is_async_context, "Async call should be in async context"
+        if not self._is_async_context:
+            raise AsyncCallError("Async call should be in async context")
 
         protocol = self._get_protocol()
 
         if self._method_name not in self._active_async_calls:
-            raise AttributeError(
+            raise AsyncCallError(
                 f"Async call for method {self._method_name} was never called"
             )
 
@@ -108,8 +115,12 @@ class RPCProxy:
         protocol = self._get_protocol()
 
         response = protocol.call(
-            host=self._host, port=self._port, method=self._method_name,
-            args=args, kwargs=kwargs, headers={}
+            host=self._host,
+            port=self._port,
+            method=self._method_name,
+            args=args,
+            kwargs=kwargs,
+            headers={},
         )
 
         handler = RemoteErrorHandler()
@@ -125,9 +136,7 @@ class RPCProxy:
         :return: RPCProtocol - protocol for communication between services.
         """
         if not self._protocol:
-            self._protocol: RPCProtocol[ORJSONSerializer] = RPCProtocol(
-                ORJSONSerializer()
-            )
+            self._protocol = RPCProtocol(ORJSONSerializer())
 
         return self._protocol
 
@@ -136,12 +145,13 @@ class ServiceProxy:
     """
     Proxy class for remote service calls.
     """
+
     def __init__(
-            self,
-            host: str | None = None,
-            port: int | None = None,
-            event_host: str | None = None,
-            event_port: int | None = None
+        self,
+        host: str | None = None,
+        port: int | None = None,
+        event_host: str | None = None,
+        event_port: int | None = None,
     ) -> None:
         self._host = host
         self._port = port
@@ -159,12 +169,9 @@ class ServiceProxy:
         return instance.__dict__.setdefault(
             self._name,
             RPCProxy(
-                instance,
-                self._host,
-                self._port,
-                self._event_host,
+                instance, self._host, self._port, self._event_host,
                 self._event_port
-            )
+            ),
         )
 
     def __set__(self, instance: Any, value: Any) -> None:
@@ -175,6 +182,7 @@ class ClusterProxy:
     """
     Proxy class for remote cluster calls.
     """
+
     def __init__(self, config: list[ClusterServiceProxy]) -> None:
         self._config = config
         self._services: dict[str, RPCProxy] = {}
@@ -196,10 +204,6 @@ class ClusterProxy:
 
     def _init(self):
         for service in self._config:
-            proxy = RPCProxy(
-                self,
-                host=service["host"],
-                port=service["port"]
-            )
+            proxy = RPCProxy(self, host=service["host"], port=service["port"])
             proxy._is_async_context = True
             self._services[service["name"]] = proxy

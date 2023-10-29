@@ -1,13 +1,13 @@
 from gevent.greenlet import Greenlet
 
 from unittest import mock
-from zero_connect import events
-from zero_connect import containers
-from zero_connect import proxies
-from zero_connect import rpc
+from noneapi import events
+from noneapi import containers
+from noneapi import proxies
+from noneapi import rpc
 
 
-@mock.patch("zero_connect.events._REGISTERED_EVENT_HANDLERS", {})
+@mock.patch("noneapi.events._REGISTERED_EVENT_HANDLERS", {})
 def test_register_events_handler():
     class Service:
         name = "test_service"

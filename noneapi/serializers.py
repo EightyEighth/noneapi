@@ -1,6 +1,7 @@
 import json
-import orjson
 from abc import ABC, abstractmethod
+
+import orjson
 
 
 class BaseSerializer(ABC):
@@ -20,7 +21,6 @@ class BaseSerializer(ABC):
 
 
 class JSONSerializer(BaseSerializer):
-
     def _serialize(self, data: dict) -> bytes:
         return json.dumps(data).encode()
 
@@ -29,7 +29,6 @@ class JSONSerializer(BaseSerializer):
 
 
 class ORJSONSerializer(BaseSerializer):
-
     def _serialize(self, data: dict) -> bytes:
         return orjson.dumps(data)
 

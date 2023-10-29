@@ -1,27 +1,28 @@
-
-from typing import Callable, Any
+from typing import Any, Callable
 
 _REGISTERED_EVENT_HANDLERS: dict[tuple[str, str], Callable] = {}
 
 
 def event_handler(service_name: str, topic: str) -> Callable:
     """
-       Decorator to register a function as an event handler.
+    Decorator to register a function as an event handler.
 
-       :param service_name: Name of the service the event belongs to.
-       :type service_name: str
+    :param service_name: Name of the service the event belongs to.
+    :type service_name: str
 
-       :param topic: Topic of the event.
-       :type topic: str
+    :param topic: Topic of the event.
+    :type topic: str
 
-       :return: The original function with the event handler registered.
-       :rtype: Callable
+    :return: The original function with the event handler registered.
+    :rtype: Callable
     """
+
     def decorator(func: Callable) -> Callable:
         key = (service_name, topic)
         if key not in _REGISTERED_EVENT_HANDLERS:
             _REGISTERED_EVENT_HANDLERS[key] = func
         return func
+
     return decorator
 
 
@@ -35,6 +36,7 @@ class EventDispatcher:
     :param port: Port where the event should be dispatched to.
     :type port: int
     """
+
     def __init__(
             self, host: str, port: int, through_broker: bool = False
     ) -> None:
