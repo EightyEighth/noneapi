@@ -3,7 +3,7 @@ requires = ["setuptools", "wheel"]
 
 [project]
 name = "noneapi"
-version = "0.1.2"
+version = "0.1.3"
 description = "Micro RPC framework based on ZeroMQ for building distributed systems"
 readme = "README.md"
 authors = [{ name = "Denys Rozlomii", email = "eighty.eighth.inc@gmail.com" }]

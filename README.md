@@ -96,7 +96,7 @@ Here's how to get started with MyLibrary:
     # containers.py
     container = Container(OrderService)
     runner = ContainerRunner(is_document_server=False)
-    runner.register(container, host="*", port=5555)
+    runner.register("order",container, host="*", port=5555)
    
    
    # app.py
@@ -249,16 +249,9 @@ Here's how to get started with MyLibrary:
    def main():
         with ClusterProxy(config) as cluster:
             order = cluster.order_service.add_order({"id": 1})
-            print(order)
-            try:
-                result = cluster.order_service.add_order({"id": 1})
-            except RemoteError as e:
-                print(e)
-                # do something
-            else:
-                # do something
+      
    ```
-    In this example, we create a `ClusterProxy` with a configuration that points to the `order_service`. The `ClusterProxy` is a context manager that allows us to access the service via `cluster.order_service`. The `add_order` method is invoked with a dictionary as an argument. The result is then printed to the console. If an error occurs, the `RemoteError` exception is raised.
+    In this example, we create a `ClusterProxy` with a configuration that points to the `order_service`. The `ClusterProxy` is a context manager that allows us to access the service via `cluster.order_service`. The `add_order` method is invoked with a dictionary as an argument.
 
     - **`ClusterProxy`**: A class that allows access to remote services. It accepts a configuration as an argument. The configuration is a list of dictionaries with the following keys: `name`, `host`, and `port`. The `name` is the identifier of the service. The `host` and `port` are the location of the service. Both `host` and `port` are optional. By default, `host` is set to `"
 
@@ -292,7 +285,43 @@ Here's how to get started with MyLibrary:
     In this example, we create a `ClusterProxy` with a configuration that points to the `order_service`. The `ClusterProxy` is a context manager that allows us to access the service via `cluster.order_service` like in the previous example but with `async_call` that allow us to call method asynchronously. The `result` method is invoked without arguments and returned result.
 
 
-7. **Docs**
+7. **Validation with pydantic**
+    ```python
+    from noneapi import rpc 
+    
+   class OrderService:
+         name = 'order_service'
+   
+         @rpc
+         def add_order(self, order_id: int, name: str):
+             # some code
+             return order
+   
+    ```
+    In this scenario, we can validate input. NoneAPI will validate input data and return error if data is not valid.
+    Only `int`, `float`, `str`, `bool` and `None` types are supported.
+    
+    If you want validate complex data, you can use `pydantic` models for that:
+    ```python
+    from noneapi import rpc
+    from pydantic import BaseModel
+   
+    class Order(BaseModel):
+        id: int
+        name: str
+    
+    class OrderService:
+        name = 'order_service'
+    
+        @rpc
+        def add_order(self, order: Order):
+            # some code
+            return order
+   ```
+   In this case NoneAPI will validate input data with `Order` model and return error if data is not valid.
+
+
+8. **Docs**
     ```python
     from noneapi import Container, ContainerRunner
     from .services import OrderService
@@ -310,7 +339,7 @@ Here's how to get started with MyLibrary:
 
 ## Changelog
 
-### Version 0.1.0 (2023-10-29)(alpha)
+### Version 0.1.3 (2023-10-29)(alpha)
 - Initial release
 
 ---
