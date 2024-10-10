@@ -9,6 +9,7 @@ pre-build:
 	mypy noneapi/
 	isort noneapi/
 	pytest --cov=noneapi tests/ --full-trace -vvv
+	rm -rf dist/
 	python -m build
 
 publish:

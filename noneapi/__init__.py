@@ -4,7 +4,7 @@ from .exceptions import RemoteError
 from .handlers import BaseRemoteErrorHandler
 from .proxies import ClusterProxy, ServiceProxy
 from .rpc import rpc
-from .serializers import ORJSONSerializer, JSONSerializer, BaseSerializer
+from .serializers import BaseSerializer, JSONSerializer, ORJSONSerializer
 
 __all__ = (
     "rpc",
