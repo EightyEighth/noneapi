@@ -15,7 +15,6 @@ def test_validations_simple_types():
 
 def test_validations_complex_types():
 
-
     def test_dict(d: dict[str, int]):
         return d
 
